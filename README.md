@@ -69,7 +69,7 @@
 2. 请求参数的类型使用的是后端定的类型
 3. request文件的引入和命名，暂时是写死的（`import request from '@/utils/request'`）
 4. **导出文件这种类型的接口（返回值是文件），需要自己添加`responseType: 'blob'`**
-5. 
+5. 函数的方法名可能会出现JavaScript的关键字（2020-11-30补充）
 
 ---
 对您有帮助的话，麻烦帮我点个star呀！
