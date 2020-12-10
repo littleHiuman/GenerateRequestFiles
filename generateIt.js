@@ -279,7 +279,7 @@ const calculateObj = {
  * ${key}模块
  * ${info.host}/swagger-ui.html
  */
-  
+
 import request from '@/utils/request'
 `
       let names = []
@@ -403,7 +403,28 @@ export const ${nameStr} = (${funsParamStr}) => request({
         .filter((item) => item)
         .reverse()
       let res = result[0]
-      const specialWords = [ 'break', 'do', 'in', 'typeof', 'case', 'else', 'instanceof', 'var', 'catch', 'export', 'new', 'void', 'class', 'extends', 'return', 'while', 'const', 'finally', 'super', 'with', 'continue', 'for', 'switch', 'yield', 'debugger', 'function', 'this', 'default', 'if', 'throw', 'delete', 'import', 'try', 'enum', 'implements', 'package', 'public', 'interface', 'protected', 'static', 'let', 'private', 'await', 'async', ]
+      // 整理自《JavaScript高级程序设计（第4版）》、《JavaScript语言精粹》
+      // 关键字与保留字
+      const specialWords = [
+        'abstract', 'async', 'await',
+        'boolean', 'break', 'byte',
+        'case', 'catch', 'char', 'class', 'const', 'continue',
+        'debugger', 'default', 'delete', 'do', 'double',
+        'else', 'enum', 'export', 'extends',
+        'false', 'final', 'finally', 'float', 'for', 'function',
+        'goto',
+        'Infinity', 'if', 'implements', 'import', 'in', 'instanceof', 'int', 'interface',
+        'let', 'long',
+        'NaN', 'native', 'new', 'null',
+        'package', 'private', 'protected', 'public',
+        'return',
+        'short', 'static', 'super', 'switch', 'synchronized',
+        'this', 'throw', 'throws', 'transient', 'true', 'try', 'typeof',
+        'undefined',
+        'var', 'void', 'volatile',
+        'while', 'with',
+        'yield',
+      ]
       if (specialWords.includes(res)) {
         if (result.length >= 2) {
           res += `${result[1].slice(0, 1).toUpperCase()}${result[1].slice(1)}`
