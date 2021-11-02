@@ -1,122 +1,149 @@
 /*
  * @Author: littleHiuman
  * @Date: 2020-11-27 12:06:50
- * @LastEditTime: 2020-11-28 16:29:51
+ * @LastEditTime: 2021-11-02 16:22:03
  * @LastEditors: littleHiuman
  * @Description: 根据swagger生成配置文件
  */
 const http = require('http')
+const https = require('https')
 const fs = require('fs')
 const path = require('path')
 const argv = process.argv.slice(2)
 
+let urlRegexp1 = /(http(s?):\/\/\d{1,3}(\.\d{1,3}){3}:\d{1,4}(\/?)(,*))+/g
+let urlRegexp2 =
+  /(http(s?):\/\/(www\.)?([a-zA-Z0-9\?\_\=\-\.\/\\]+(\.[a-zA-Z0-9\?\_\=\-\.\/\\]+)*)(\/?)(,*))+/g
+
 // 检查执行该文件的参数
-function checkArgv(argv) {
+function checkArgv(arg) {
   let ips = []
-  if (!argv.length) {
+  if (!arg.length) {
     throw new Error(
       '出现该错误是因为没有传参，传参例子（多个ip使用,分割）：\n\t--ip=http://255.255.255.255:3000,http://225.225.225.255:300\n\n'
     )
   }
-  argv.forEach((item) => {
+  arg.forEach((item) => {
     let key = item.match(/(?<=--)ip(?==)/)
-    if (key) {
-      key = key[0]
-    } else {
-      throw new Error('参数有误')
+    if (!key) {
+      throw new Error('参数有误，参数以 --ip= 开头')
     }
-    let value = item.match(
-      /(?<==)(?:http(?:s{0,1}):\/\/\d{1,3}(?:\.\d{1,3}){3}:\d{4}(?:\/{0,1})(?:,{0,})){1,}/g
-    )
-    if (value) {
-      value = value[0]
-    } else {
-      throw new Error('ip有误')
+    key = key[0]
+
+    let value = item.match(urlRegexp1) ? item.match(urlRegexp1)[0] : ''
+    if (!value) {
+      value = item.match(urlRegexp2) ? item.match(urlRegexp2)[0] : ''
     }
-    if (key && value) {
-      ips = Array.from(
-        new Set(
-          value.split(',').map((item) => {
-            if (item.slice(-1).charCodeAt(0) === 47) {
-              item = item.slice(0, -1)
-            }
-            return item.trim()
-          })
-        )
+    if (!value) {
+      throw new Error('ip 有误')
+    }
+    if (!key || !value) {
+      return
+    }
+    ips = Array.from(
+      new Set(
+        value.split(',').map((ip) => {
+          if (ip.slice(-1).charCodeAt(0) === 47) {
+            ip = ip.slice(0, -1)
+          }
+          return ip.trim()
+        })
       )
-    }
+    )
     if (!ips.length) {
-      throw new Error('ip有误')
-    } else {
-      ips.forEach((item, i) => {
-        const url = `${item}/swagger-resources`
-        getResources(url, i)
-      })
+      throw new Error('ip 有误')
     }
+    ips.forEach((ip, i) => {
+      const url = `${ip}/swagger-resources`
+      getResources(url, i)
+    })
   })
 }
 checkArgv(argv)
 
+function isHttps(url) {
+  return url.split(':')[0] === 'https'
+}
+function requestHandle(url, res, cb) {
+  const { statusCode } = res
+  const contentType = res.headers['content-type']
+
+  let error
+  // 任何 2xx 状态码都表示成功的响应，但是这里只检查 200。
+  if (statusCode !== 200) {
+    error = new Error(`请求失败\n状态码: ${statusCode}`)
+  } else if (!/^application\/json/.test(contentType)) {
+    error = new Error(
+      '无效的 content-type.\n' +
+        `期望的是 application/json 但接收到的是 ${contentType}`
+    )
+  }
+  if (error) {
+    console.error(error.message)
+    // 消费响应的数据来释放内存。
+    res.resume()
+    return
+  }
+
+  res.setEncoding('utf8')
+  let rawData = ''
+  res.on('data', (chunk) => {
+    rawData += chunk
+  })
+  res.on('end', () => {
+    try {
+      const parsedData = JSON.parse(rawData)
+      if (cb) {
+        cb({ url, parsedData })
+      }
+    } catch (e) {
+      console.error(e.message)
+    }
+  })
+}
 // 请求
 function httpGet(url, cb) {
-  http
-    .get(url, (res) => {
-      const { statusCode } = res
-      const contentType = res.headers['content-type']
-
-      let error
-      // 任何 2xx 状态码都表示成功的响应，但是这里只检查 200。
-      if (statusCode !== 200) {
-        error = new Error(`请求失败\n状态码: ${statusCode}`)
-      } else if (!/^application\/json/.test(contentType)) {
-        error = new Error(
-          '无效的 content-type.\n' +
-            `期望的是 application/json 但接收到的是 ${contentType}`
-        )
-      }
-      if (error) {
-        console.error(error.message)
-        // 消费响应的数据来释放内存。
-        res.resume()
-        return
-      }
-
-      res.setEncoding('utf8')
-      let rawData = ''
-      res.on('data', (chunk) => {
-        rawData += chunk
+  let isHttpsRes = isHttps(url)
+  if (isHttpsRes) {
+    https
+      .get(url, (res) => {
+        requestHandle(url, res, cb)
       })
-      res.on('end', () => {
-        try {
-          const parsedData = JSON.parse(rawData)
-          if (cb) {
-            cb({ url, parsedData })
-          }
-        } catch (e) {
-          console.error(e.message)
-        }
+      .on('error', (e) => {
+        console.error(`出现错误: ${e.message}`)
       })
-    })
-    .on('error', (e) => {
-      console.error(`出现错误: ${e.message}`)
-    })
+  } else {
+    http
+      .get(url, (res) => {
+        requestHandle(url, res, cb)
+      })
+      .on('error', (e) => {
+        console.error(` 出现错误: ${e.message}`)
+      })
+  }
 }
 
 // 主流程
 function getResources(url, i) {
   httpGet(url, (res) => {
     const { url, parsedData: data } = res
-    let result = url.match(/http(?:s{0,1}):\/\/\d{1,3}(?:\.\d{1,3}){3}:\d{4}/)
+    let result = url.match(urlRegexp1) ? url.match(urlRegexp1)[0] : ''
+    if (!result) {
+      result = url.match(urlRegexp2) ? url.match(urlRegexp2)[0] : ''
+    }
     if (!result || !data.length) {
       return
     }
-    result = result[0]
     data.forEach((element) => {
       const secUrl = `${result}${element.location}`
       httpGet(secUrl, ({ parsedData }) => {
         const urlsInfo = calculateObj.calcUrl(parsedData.paths)
         const requestInfo = calculateObj.calcRequest(parsedData.paths)
-        const info = { title: parsedData?.info?.title, host: result }
+        let infoTitle = ''
+        if (parsedData.info && parsedData.info.title) {
+          infoTitle = parsedData.info.title
+        }
+        const info = { title: infoTitle, host: result }
         calculateObj.calcDefinitions(parsedData.definitions, requestInfo)
         folderObj.writeFile(urlsInfo, requestInfo, info, i)
       })
@@ -135,7 +162,7 @@ const calculateObj = {
     temPathsKeys.forEach((item) => {
       let secKeys = Object.keys(paths[item])
       len += secKeys.length
-      const prefix = item.split('/').filter((item) => item)
+      const prefix = item.split('/').filter((obj) => obj)
       if (secKeys.length > 1) {
         secKeys = secKeys.map((obj) => (obj = `${item}:${obj}`))
         urlsObj[prefix[0]]
@@ -151,7 +178,7 @@ const calculateObj = {
       len2 += item.length
     })
     if (len !== len2) {
-      console.log(`计算url后缺失${ Math.abs(len - len2) }个【原因：url重复】`)
+      console.log(`计算url后缺失${Math.abs(len - len2)}个【原因：url重复】`)
     }
     return urlsObj
   },
@@ -171,12 +198,12 @@ const calculateObj = {
             desc: obj.summary,
             param,
             url: key,
-            method: eKey,
+            method: eKey
           }
           if (obj.consumes) {
             info.headers = {
               'Content-Type':
-                obj.consumes.length === 1 ? obj.consumes + '' : obj.consumes,
+                obj.consumes.length === 1 ? obj.consumes + '' : obj.consumes
             }
           }
           if (Object.keys(element).length === 1) {
@@ -204,29 +231,42 @@ const calculateObj = {
           break
         case 'path':
         case 'header':
-          prefix = ''
+        // prefix = ''
+        // break
         default:
           if (method === 'get') {
             prefix = 'params.'
           } else if (method === 'post' || method === 'put') {
             prefix = 'data.'
-          } else if (method === 'delete') {
-            prefix = ''
+            // } else if (method === 'delete') {
+            //   prefix = ''
           }
           break
       }
-      let definitions =
-        (item?.schema?.$ref ?? '') || (item?.schema?.items?.$ref ?? '')
+
+      let definitions = ''
+      if (item.schema && item.schema.$ref) {
+        definitions = item.schema.$ref
+      } else if (item.schema && item.schema.items && item.schema.items.$ref) {
+        definitions = item.schema.items.$ref
+      }
+
+      let objParamType = ''
+      if (item.type) {
+        objParamType = item.type
+      } else if (item.schema && item.schema.type) {
+        objParamType = item.schema.type
+      }
       const obj = {
-        paramType: item?.type || (item?.schema?.type ?? ''),
-        paramDesc: item?.description ?? '',
-        // required: item?.required ?? '',
+        paramType: objParamType,
+        paramDesc: item.description || ''
+        // required: item.required || '',
       }
       if (definitions) {
         obj.definitions = definitions.split('/').slice(-1) + ''
       }
-      if (item?.in === 'path') {
-        obj.in = item?.in
+      if (item.in && item.in === 'path') {
+        obj.in = item.in
       }
       tem[`${prefix}${item.name}`] = obj
     })
@@ -249,13 +289,13 @@ const calculateObj = {
             for (const property in info.properties) {
               const propertyInfo = info.properties[property]
               let { type } = propertyInfo
-              if (propertyInfo?.items?.type) {
-                type += `<${propertyInfo?.items?.type}>`
+              if (propertyInfo.items && propertyInfo.items.type) {
+                type += `<${propertyInfo.items.type}>`
               }
               element.param[`${p}.${property}`] = {
                 paramType: type,
-                paramDesc: propertyInfo.description ?? '',
-                // required: obj.required ?? '',
+                paramDesc: propertyInfo.description || ''
+                // required: obj.required || '',
               }
             }
             delete obj.definitions
@@ -272,19 +312,18 @@ const calculateObj = {
     const fileInfo = {}
     for (const key in urlsInfo) {
       // key是模块
-      // elment是模块下所有链接
+      // element是模块下所有链接
       const element = urlsInfo[key]
       let str = `/**
  * ${info.title}
  * ${key}模块
  * ${info.host}/swagger-ui.html
  */
-
 import request from '@/utils/request'
 `
       let names = []
       for (const k in element) {
-        // url是具体某条链接
+        //url是具体某条链接
         const urlKey = element[k]
         // 从requestInfo中读取链接的信息
         const requestMsg = requestInfo[urlKey]
@@ -292,11 +331,8 @@ import request from '@/utils/request'
         // 参数在url里的
         // 参数不在url里的：params或data
         // 剩余信息rest
-        const {
-          paramStr,
-          paramTypeStr,
-          funsParamStr,
-        } = calculateObj.checkParam(param)
+        const { paramStr, paramTypeStr, funsParamStr } =
+          calculateObj.checkParam(param)
         const requestUrl = calculateObj.calcRequestUrl(url)
         let nameStr = calculateObj.calcNameStr(urlKey, url)
         if (names.includes(nameStr)) {
@@ -331,8 +367,8 @@ export const ${nameStr} = (${funsParamStr}) => request({
  * @param {${element.paramType}} ${key} ${element.paramDesc}`
       let res = key.match(/(data|params)(?=\.)/)
       if (res) {
-        res = res[0]
-        paramType[res] = res
+        let result = res[0]
+        paramType[result] = result
       } else {
         funsParam.push(key)
       }
@@ -347,7 +383,7 @@ export const ${nameStr} = (${funsParamStr}) => request({
     return {
       paramStr,
       paramTypeStr,
-      funsParamStr,
+      funsParamStr
     }
   },
   // 处理文件中请求的url
@@ -389,7 +425,9 @@ export const ${nameStr} = (${funsParamStr}) => request({
         .split('/')
         .filter((item) => item)
         .reverse()[0]
-      return `${prefix}${calcName.slice(0, 1).toUpperCase()}${calcName.slice(1)}`
+      let afternameStart = `${calcName.slice(0, 1).toUpperCase()}`
+      let afternameEnd = `${calcName.slice(1)}`
+      return `${prefix}${afternameStart}${afternameEnd}`
     } else {
       const index = url.indexOf('{')
       if (index !== -1) {
@@ -406,24 +444,72 @@ export const ${nameStr} = (${funsParamStr}) => request({
       // 整理自《JavaScript高级程序设计（第4版）》、《JavaScript语言精粹》
       // 关键字与保留字
       const specialWords = [
-        'abstract', 'async', 'await',
-        'boolean', 'break', 'byte',
-        'case', 'catch', 'char', 'class', 'const', 'continue',
-        'debugger', 'default', 'delete', 'do', 'double',
-        'else', 'enum', 'export', 'extends',
-        'false', 'final', 'finally', 'float', 'for', 'function',
+        'abstract',
+        'async',
+        'await',
+        'boolean',
+        'break',
+        'byte',
+        'case',
+        'catch',
+        'char',
+        'class',
+        'const',
+        'continue',
+        'debugger',
+        'default',
+        'delete',
+        'do',
+        'double',
+        'else',
+        'enum',
+        'export',
+        'extends',
+        'false',
+        'final',
+        'finally',
+        'float',
+        'for',
+        'function',
         'goto',
-        'Infinity', 'if', 'implements', 'import', 'in', 'instanceof', 'int', 'interface',
-        'let', 'long',
-        'NaN', 'native', 'new', 'null',
-        'package', 'private', 'protected', 'public',
+        'Infinity',
+        'if',
+        'implements',
+        'import',
+        'in',
+        'instanceof',
+        'int',
+        'interface',
+        'let',
+        'long',
+        'NaN',
+        'native',
+        'new',
+        'null',
+        'package',
+        'private',
+        'protected',
+        'public',
         'return',
-        'short', 'static', 'super', 'switch', 'synchronized',
-        'this', 'throw', 'throws', 'transient', 'true', 'try', 'typeof',
+        'short',
+        'static',
+        'super',
+        'switch',
+        'synchronized',
+        'this',
+        'throw',
+        'throws',
+        'transient',
+        'true',
+        'try',
+        'typeof',
         'undefined',
-        'var', 'void', 'volatile',
-        'while', 'with',
-        'yield',
+        'var',
+        'void',
+        'volatile',
+        'while',
+        'with',
+        'yield'
       ]
       if (specialWords.includes(res)) {
         if (result.length >= 2) {
@@ -436,7 +522,7 @@ export const ${nameStr} = (${funsParamStr}) => request({
     }
   },
   // 处理出现重复函数名（重命名）
-  calcRepeatNameStr: function (allnames, url) {
+  calcRepeatNameStr: function (allNames, url) {
     const index = url.indexOf('{')
     if (index !== -1) {
       url = url.slice(0, index)
@@ -455,11 +541,11 @@ export const ${nameStr} = (${funsParamStr}) => request({
     } else {
       res += Date.now()
     }
-    if (allnames.includes(res)) {
+    if (allNames.includes(res)) {
       console.log(`处理函数名后，还有重复！！`)
-      // 没有保存到allnames里
+      // 没有保存到allNames里
     } else {
-      allnames.push(res)
+      allNames.push(res)
     }
     return res
   },
@@ -485,7 +571,7 @@ export const ${nameStr} = (${funsParamStr}) => request({
   ${restStr}`
     }
     return restStr
-  },
+  }
 }
 
 // 文件/文件夹处理相关
@@ -524,9 +610,9 @@ const folderObj = {
     for (const key in fileInfo) {
       const element = fileInfo[key]
       fs.writeFileSync(`./${dirname}/${key}`, element, {
-        encoding: 'utf8',
+        encoding: 'utf8'
       })
     }
     console.log(`${info.host}一共${Object.keys(fileInfo).length}个模块`)
-  },
+  }
 }
