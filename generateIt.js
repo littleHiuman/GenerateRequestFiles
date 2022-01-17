@@ -13,7 +13,7 @@ const argv = process.argv.slice(2)
 
 let urlRegexp1 = /(http(s?):\/\/\d{1,3}(\.\d{1,3}){3}:\d{1,4}(\/?)(,*))+/g
 let urlRegexp2 =
-  /(http(s?):\/\/(www\.)?([a-zA-Z0-9\?\_\=\-\.\/\\]+(\.[a-zA-Z0-9\?\_\=\-\.\/\\]+)*)(\/?)(,*))+/g
+  /http(s?):\/\/[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+/g
 
 // 检查执行该文件的参数
 function checkArgv(arg) {
