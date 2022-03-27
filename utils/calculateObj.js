@@ -282,8 +282,7 @@ import request from '@/utils/request'
         const requestUrl = calculateObj.calcRequestUrl(url, param)
         let nameStr = calculateObj.calcNameStr(fnsName, url, names)
         const restStr = calculateObj.calcRestStr(rest)
-        str += `
-/**
+        str += `\n/**
  * @description ${desc}${paramStr}
  */
 export const ${nameStr} = (${fnsParamStr}) => request({
@@ -305,8 +304,7 @@ export const ${nameStr} = (${fnsParamStr}) => request({
 
     for (const key in param) {
       const element = param[key]
-      paramStr += `
- * @param {${element.paramType || 'unknown'}} ${key} ${element.paramDesc}`
+      paramStr += `\n * @param {${element.paramType || 'unknown'}} ${key} ${element.paramDesc}`
       const res = key.match(/(data|params)(?=\.)/)
       if (res) {
         const result = res[0]
@@ -319,11 +317,10 @@ export const ${nameStr} = (${fnsParamStr}) => request({
     }
 
     fnsParamStr = fnsParam.join(', ')
-    let paramTypeStr = paramType.join(', ')
+    let paramTypeStr = paramType.join(',\n\t')
     fnsParamStr += paramTypeStr
     if (paramTypeStr.length) {
-      paramTypeStr = `
-  ${paramTypeStr},`
+      paramTypeStr = `\n\t${paramTypeStr},`
     }
 
     return {
@@ -447,8 +444,7 @@ export const ${nameStr} = (${fnsParamStr}) => request({
     }
 
     if (restStr.length) {
-      restStr = `
-  ${restStr}`
+      restStr = `\n\t${restStr}`
     }
 
     return restStr
