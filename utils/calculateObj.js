@@ -14,29 +14,71 @@ function checkArrItem(arr, fnsName) {
 
 // 计算相关
 const calculateObj = {
+  checkExcludesIncludes(url, excludes, includes) {
+    if (excludes.length) {
+      if (excludes.length > 1) {
+        for (const key in excludes) {
+          if (Object.hasOwnProperty.call(excludes, key)) {
+            const element = excludes[key]
+            if (url.indexOf(element) === 0) {
+              return true
+            }
+          }
+        }
+        return false
+      } else {
+        return url.indexOf(excludes[0]) === 0
+      }
+    }
+    if (includes.length) {
+      if (includes.length > 1) {
+        for (const key in includes) {
+          if (Object.hasOwnProperty.call(includes, key)) {
+            const element = includes[key]
+            if (url.indexOf(element) === 0) {
+              return false
+            }
+          }
+        }
+        return true
+      } else {
+        return url.indexOf(includes[0]) !== 0
+      }
+    }
+    return false
+  },
   // 分模块保存url
   // 处理每个请求的数据（参数、描述、url、请求方式…）
-  calcUrl: function (paths, definitions) {
+  calcUrl: function (paths, definitions, excludes, includes) {
     const urlsObj = {}
     for (const key in paths) {
       if (Object.hasOwnProperty.call(paths, key)) {
-        const element = paths[key]
-        const secKeys = Object.keys(element)
-        if (secKeys.length) {
-          const prefix = key.split('/').filter(obj => obj)
-          const firstPrefix = prefix[0]
+        let noNeedToDoNext = calculateObj.checkExcludesIncludes(
+          key,
+          excludes,
+          includes
+        )
+        if (noNeedToDoNext) {
+          continue
+        } else {
+          const element = paths[key]
+          const secKeys = Object.keys(element)
+          if (secKeys.length) {
+            const prefix = key.split('/').filter(obj => obj)
+            const firstPrefix = prefix[0]
 
-          if (!urlsObj[firstPrefix]) {
-            urlsObj[firstPrefix] = {}
+            if (!urlsObj[firstPrefix]) {
+              urlsObj[firstPrefix] = {}
+            }
+
+            calculateObj.handleUrlNMethod(
+              secKeys,
+              key,
+              urlsObj[firstPrefix],
+              element,
+              definitions
+            )
           }
-
-          calculateObj.handleUrlNMethod(
-            secKeys,
-            key,
-            urlsObj[firstPrefix],
-            element,
-            definitions
-          )
         }
       }
     }

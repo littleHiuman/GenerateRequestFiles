@@ -1,7 +1,7 @@
 /*
  * @Author: littleHiuman
  * @Date: 2020-11-27 12:06:50
- * @LastEditTime: 2022-03-26 19:38:26
+ * @LastEditTime: 2022-03-27 20:01:04
  * @LastEditors: littleHiuman
  * @Description: 根据swagger生成配置文件
  */
@@ -83,7 +83,12 @@ function httpGet(url, sussCb, errorCb) {
 
 // 计算入口
 function calculatePaths(parsedData, url, i) {
-  const allInfo = calculateObj.calcUrl(parsedData.paths, parsedData.definitions)
+  const allInfo = calculateObj.calcUrl(
+    parsedData.paths,
+    parsedData.definitions,
+    excludes,
+    includes
+  )
   let infoTitle = ''
 
   if (parsedData.info && parsedData.info.title) {
@@ -120,7 +125,7 @@ function getResources(url, i, errorCallback) {
 }
 
 // 开始~
-const ips = checkArgv(argv)
+const { ips, excludes, includes } = checkArgv(argv)
 for (let i = 0; i < ips.length; i++) {
   const ip = ips[i]
   const url = `${ip}/swagger-resources`

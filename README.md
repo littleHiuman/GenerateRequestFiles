@@ -1,13 +1,13 @@
 <!--
  * @Author: littleHiuman
  * @Date: 2020-11-28 15:52:21
- * @LastEditTime: 2022-03-27 18:18:18
+ * @LastEditTime: 2022-03-27 19:57:31
  * @LastEditors: littleHiuman
  * @Description: README文件
 -->
 # GenerateRequestFiles
-根据后端提供的swagger生成配置文件（JavaScript文件）
-【简单的说，就是生成api目录】
+根据后端提供的swagger生成接口配置文件（JavaScript文件）
+【简单的说，就是“一键”生成api目录】
 
 ## 目录
 
@@ -20,13 +20,27 @@
 ---
 ## <a name="用法">用法</a>
 
-假设后端提供的swagger地址是 http://255.255.255.255:3000/swagger-ui.html ，只需要取前面部分就可以了（即ip加端口：http://255.255.255.255:3000 ，域名的同理）
+现有参数
+1. ip 参数（多个 ip/域名 用 , 分割） **必填**
+2. excludes 参数（多个 url 用 , 分割）
+    【目前做法是：接口 url 的**开头** 和 excludes 的内容作比较】
+3. includes 参数（多个url 用 , 分割）
+    【目前做法是：接口 url 的**开头** 和 includes 的内容作比较】
+    如果传入了这个参数，只处理以这些url开头的接口地址
 
-一个ip/域名的情况下：
+假设 swagger 的地址是 http://255.255.255.255:3000/swagger-ui.html ，只需要取前面部分就可以了（即 ip 加端口：http://255.255.255.255:3000 ，域名的同理）
+
+一个 ip/域名 的情况下：
 `node generateIt.js --ip=http://255.255.255.255:3000`
 
-多个ip/域名的情况下（使用,来分割）：
+多个 ip/域名 的情况下（使用,来分割）：
 `node generateIt.js --ip=http://255.255.255.255:3000,http://255.255.255.254:1000`
+
+某些 url 开头的接口**不处理**（使用,来分割）：
+`node generateIt.js --ip=http://255.255.255.255:3000 --excludes=/gen,/test`
+
+**只处理**某些 url 开头的接口（使用,来分割）：
+`node generateIt.js --ip=http://255.255.255.255:3000 --includes=/gen,/test`
 
 ---
 
@@ -91,8 +105,6 @@
 
 6. 还有就是！`import request from '@/utils/request'`这一句我暂时是写死的
 
-7.
-
 7. 方法名 或 url 发现重复的话，会拼接时间戳，如果还是重复的话，会有重复的提示语
 
     1. “计算url后仍然重复：url为 \$\{url\}，请求方式为 \$\{method\}”（不会保存，即不会覆盖）
@@ -112,21 +124,21 @@
 
 4. **导出文件这种类型的接口（返回值是文件），需要自己添加`responseType: 'blob'`**
 
-5. 函数的方法名可能会出现JavaScript的关键字
+5. ~~函数的方法名可能会出现JavaScript的关键字~~
 
     【目前处理方式：如果有关键字，拼接url中倒数第二段字符串，否则拼接时间戳】
 
-6. 函数名 或 url 发现重复的话，【目前处理方式：拼接时间戳】，处理后如果还是重复的话，会有重复的提示语：
+6. ~~函数名 或 url 发现重复的话，【目前处理方式：拼接时间戳】，处理后如果还是重复的话，会有重复的提示语：~~
 
     1. “计算url后仍然重复：url为 \$\{url\}，请求方式为 \$\{method\}”（不会保存，即不会覆盖）
 
     2. “处理函数名后，还有重复！！”（不会保存，即不会覆盖）
 
-7. （感谢 [@JamLin29](https://github.com/JamLin29) 提的[issue](https://github.com/littleHiuman/GenerateRequestFiles/issues/1)）
+7. （~~感谢 [@JamLin29](https://github.com/JamLin29) 提的[issue](https://github.com/littleHiuman/GenerateRequestFiles/issues/1)）~~
 
    1. 需要node版本14以上【已修复，8.17.0以上可用】
 
-   2. 域名只能写ip【已修复，可以包含字母等的域名】
+   2. 域名只能写ip【已修复，ip/域名可以包含数字字母等】
 
 ---
 ## <a name="最后">最后</a>

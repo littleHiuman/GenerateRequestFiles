@@ -9,19 +9,57 @@ function checkArgv(arg) {
   }
 
   let ips = null
+  let excludes = null
+  let includes = null
+
+  checkingFn(arg, 'ip', (state, res) => {
+    if (!state || !res) {
+      throw new Error(
+        '参数有误，ip的传参例子（多个ip/域名使用,分割）：\n\t--ip=http://255.255.255.255:3000,http://225.225.225.255:300\n\n'
+      )
+    } else {
+      ips = checkIps(res)
+    }
+  })
+
+  checkingFn(arg, 'excludes', (state, res) => {
+    if (state && !res) {
+      throw new Error(
+        '参数有误，excludes传参例子（多个url使用,分割）：\n\t--excludes=/gen,/test\n\n'
+      )
+    } else {
+      excludes = Array.from(new Set(res))
+    }
+  })
+
+  checkingFn(arg, 'includes', (state, res) => {
+    if (state && !res) {
+      throw new Error(
+        '参数有误，includes传参例子（多个url使用,分割）：\n\t--includes=/gen,/test\n\n'
+      )
+    } else {
+      includes = Array.from(new Set(res))
+    }
+  })
+
+  return { ips, excludes, includes }
+}
+
+function checkingFn(arg, name, cb) {
+  let res = null
+  let state = false
+  let argName = '--' + name + '='
+  let argNameLen = argName.length
   for (const item of arg) {
-    const state = item.slice(0, 5) == '--ip='
+    state = item.slice(0, argNameLen) == argName
     if (state) {
-      ips = item.slice(5).split(',')
+      res = item.slice(argNameLen).split(',')
       break
     }
   }
-  if (!ips) {
-    throw new Error(
-      '参数有误，传参例子（多个ip/域名使用,分割）：\n\t--ip=http://255.255.255.255:3000,http://225.225.225.255:300\n\n'
-    )
+  if (cb) {
+    cb(state, res)
   }
-  return checkIps(ips)
 }
 
 // 检查ip/域名
